@@ -228,3 +228,7 @@ __marimo__/
 .DS_Store
 Thumbs.db
 
+# Other file
+docs/DETAILED_IMPLEMENTATION_PLAN.md
+docs/SAMPLE_DETAILED_REPORT_CONTENT.md
+
