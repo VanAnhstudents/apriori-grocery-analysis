@@ -205,3 +205,26 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Unit test / coverage reports
+*.py,cover
+*.hypothesis/
+
+# IDE / Editor specific
+# VS Code
+.vscode/
+# PyCharm / IntelliJ
+.idea/
+*.iml
+# Eclipse
+.project
+.pydevproject
+.metadata/
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Mac / Windows system files
+.DS_Store
+Thumbs.db
+
