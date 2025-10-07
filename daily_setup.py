@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Script setup trước khi bắt đầu phiên làm việc
-Hỗ trợ PyCharm và Google Colabx
+Hỗ trợ PyCharm và Google Colab
 """
 
 import subprocess
@@ -20,7 +20,7 @@ def is_colab():
         return False
 
 
-def run_command(command, description, check_error=True):
+def run_command(command, description, check_error=True, capture_output=True):
     """Chạy command và hiển thị kết quả"""
     print(f"\n📌 {description}...")
     try:
@@ -28,18 +28,19 @@ def run_command(command, description, check_error=True):
             command,
             shell=True,
             check=True,
-            capture_output=True,
+            capture_output=capture_output,
             text=True
         )
-        if result.stdout:
+        if capture_output and result.stdout:
             print(result.stdout)
-        return result.stdout.strip()
+        return result.stdout.strip() if capture_output else "SUCCESS"
     except subprocess.CalledProcessError as e:
+        error_msg = e.stderr if capture_output else str(e)
         if check_error:
-            print(f"❌ Lỗi: {e.stderr}")
+            print(f"❌ Lỗi: {error_msg}")
             return None
         else:
-            return e.stderr.strip()
+            return error_msg.strip()
 
 
 def get_input(prompt, default=None):
@@ -103,10 +104,152 @@ def setup_colab():
             sys.exit(1)
 
 
+def setup_dependencies():
+    """Cài đặt và cập nhật thư viện phù hợp với môi trường"""
+    print("\n📦 THIẾT LẬP THƯ VIỆN VÀ MÔI TRƯỜNG")
+    print("=" * 50)
+
+    # Kiểm tra xem có requirements.txt không
+    has_requirements = os.path.exists("requirements.txt")
+
+    if has_requirements:
+        print("📄 Tìm thấy requirements.txt")
+        install_req = get_input("Cài đặt từ requirements.txt? (y/n)", "y").lower()
+        if install_req == 'y':
+            if run_command("pip install -r requirements.txt", "Cài đặt từ requirements.txt"):
+                print("✅ Cài đặt từ requirements.txt thành công")
+            else:
+                print("❌ Lỗi khi cài đặt từ requirements.txt")
+
+    # Các thư viện cơ bản cho dự án Python
+    base_libraries = [
+        "numpy", "pandas", "matplotlib", "seaborn",
+        "requests", "python-dotenv", "tqdm"
+    ]
+
+    # Thư viện cho AI/ML (nếu cần)
+    ai_libraries = [
+        "torch", "torchvision", "tensorflow", "scikit-learn",
+        "opencv-python", "Pillow", "transformers"
+    ]
+
+    # Thư viện cho web development
+    web_libraries = [
+        "flask", "django", "fastapi", "streamlit",
+        "beautifulsoup4", "selenium"
+    ]
+
+    print("\n🔧 Chọn loại thư viện cần cài đặt:")
+    print("   1. Cơ bản (numpy, pandas, matplotlib, ...)")
+    print("   2. AI/ML (pytorch, tensorflow, sklearn, ...)")
+    print("   3. Web (flask, django, fastapi, ...)")
+    print("   4. Tất cả")
+    print("   5. Tự chọn thư viện")
+    print("   6. Bỏ qua")
+
+    choice = get_input("Lựa chọn của bạn (1-6)", "1")
+
+    libraries_to_install = []
+
+    if choice == "1":
+        libraries_to_install = base_libraries
+    elif choice == "2":
+        libraries_to_install = ai_libraries
+    elif choice == "3":
+        libraries_to_install = web_libraries
+    elif choice == "4":
+        libraries_to_install = base_libraries + ai_libraries + web_libraries
+    elif choice == "5":
+        custom_libs = get_input("Nhập tên thư viện (cách nhau bằng dấu cách)", "")
+        if custom_libs:
+            libraries_to_install = custom_libs.split()
+
+    if choice in ["1", "2", "3", "4", "5"] and libraries_to_install:
+        print(f"\n📦 Sẽ cài đặt {len(libraries_to_install)} thư viện:")
+        for lib in libraries_to_install:
+            print(f"   - {lib}")
+
+        confirm = get_input("\nTiếp tục cài đặt? (y/n)", "y").lower()
+
+        if confirm == 'y':
+            # Cập nhật pip trước
+            print("\n🔄 Cập nhật pip...")
+            run_command("pip install --upgrade pip", "Cập nhật pip", check_error=False)
+
+            # Cài đặt từng thư viện
+            success_count = 0
+            for lib in libraries_to_install:
+                print(f"\n📥 Đang cài đặt {lib}...")
+                if run_command(f"pip install {lib}", f"Cài đặt {lib}", check_error=False):
+                    success_count += 1
+                    print(f"✅ {lib} - thành công")
+                else:
+                    print(f"⚠️  {lib} - có thể có vấn đề")
+
+            print(f"\n📊 Kết quả: {success_count}/{len(libraries_to_install)} thư viện được cài đặt thành công")
+
+    # Cài đặt pre-commit hooks nếu có
+    if os.path.exists(".pre-commit-config.yaml"):
+        print("\n🔧 Tìm thấy pre-commit config")
+        install_precommit = get_input("Cài đặt pre-commit hooks? (y/n)", "y").lower()
+        if install_precommit == 'y':
+            run_command("pip install pre-commit", "Cài đặt pre-commit", check_error=False)
+            run_command("pre-commit install", "Cài đặt pre-commit hooks", check_error=False)
+
+    # Cài đặt thêm các công cụ hữu ích
+    if is_colab():
+        print("\n🔧 Cài đặt công cụ cho Colab...")
+        # Các công cụ hữu ích cho Colab
+        colab_tools = ["jupyter", "ipywidgets", "plotly"]
+        for tool in colab_tools:
+            run_command(f"pip install {tool}", f"Cài đặt {tool}", check_error=False)
+    else:
+        print("\n🔧 Cài đặt công cụ cho local development...")
+        # Các công cụ hữu ích cho local
+        local_tools = ["black", "flake8", "pytest", "jupyter"]
+        install_tools = get_input("Cài đặt công cụ code quality? (black, flake8, pytest) (y/n)", "y").lower()
+        if install_tools == 'y':
+            for tool in local_tools:
+                run_command(f"pip install {tool}", f"Cài đặt {tool}", check_error=False)
+
+
+def check_system_dependencies():
+    """Kiểm tra các dependency hệ thống"""
+    print("\n🔍 KIỂM TRA HỆ THỐNG")
+    print("=" * 50)
+
+    # Kiểm tra Python version
+    python_version = run_command("python --version", "Kiểm tra Python version", check_error=False)
+    if python_version:
+        print(f"✅ {python_version}")
+
+    # Kiểm tra pip
+    pip_version = run_command("pip --version", "Kiểm tra pip", check_error=False)
+    if pip_version:
+        print(f"✅ Pip có sẵn")
+
+    # Kiểm tra git
+    git_version = run_command("git --version", "Kiểm tra Git", check_error=False)
+    if git_version:
+        print(f"✅ {git_version}")
+
+    # Kiểm tra free disk space (Unix/Linux)
+    if not is_colab():
+        try:
+            disk_info = run_command("df -h .", "Kiểm tra dung lượng ổ đĩa", check_error=False)
+            if disk_info:
+                print(f"💾 Thông tin ổ đĩa:\n{disk_info}")
+        except:
+            pass
+
+
 def main():
     print("=" * 70)
-    print("🚀 SETUP PHIÊN LÀM VIỆC MỚI - NHÓM 5 NGƯỜI")
+    print("🚀 SETUP PHIÊN LÀM VIỆC MỚI")
     print("=" * 70)
+
+    # Kiểm tra hệ thống
+    check_system_dependencies()
 
     # Setup cho Colab nếu cần
     if is_colab():
@@ -194,12 +337,8 @@ def main():
         else:
             print(f"⚠️  Branch {main_branch} chưa có trên remote hoặc chưa có commits")
 
-    # Hiển thị danh sách thành viên (gợi ý)
-    print("\n👥 Thành viên nhóm gợi ý cho tên branch:")
-    members = ["member1", "member2", "member3", "member4", "member5"]
-    for i, member in enumerate(members, 1):
-        print(f"   {i}. {member}")
-    print("   (Bạn có thể chỉnh sửa trong code để thay tên thực)")
+    # THIẾT LẬP THƯ VIỆN - PHẦN MỚI
+    setup_dependencies()
 
     # Tạo branch mới
     create_new = get_input("\nTạo branch mới? (y/n)", "y").lower()
@@ -244,8 +383,14 @@ def main():
     print("\n📝 Commit gần nhất:")
     run_command("git log -1 --oneline", "Hiển thị commit cuối", check_error=False)
 
+    # Hiển thị thư viện đã cài đặt
+    print("\n📦 Các thư viện chính đã cài đặt:")
+    run_command("pip list | grep -E '(numpy|pandas|torch|tensorflow|flask|django)'",
+                "Liệt kê thư viện quan trọng", check_error=False)
+
     print("\n💪 Sẵn sàng làm việc!")
     print("💡 Tip: Nhớ pull thường xuyên để cập nhật code từ team!")
+    print("🚀 Chúc bạn coding vui vẻ!")
 
 
 if __name__ == "__main__":

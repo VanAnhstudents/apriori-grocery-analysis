@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Script đẩy code lên GitHub và tạo Pull Request - BẢN ĐÃ SỬA
+Script đẩy code lên GitHub và tạo Pull Request - BẢN ĐÃ SỬA LỖI
 Hỗ trợ PyCharm và Google Colab
 """
 
@@ -21,7 +21,7 @@ def is_colab():
 
 
 def run_command(command, description, capture=True, check_error=True):
-    """Chạy command và hiển thị kết quả"""
+    """Chạy command và hiển thị kết quả - ĐÃ SỬA LỖI"""
     print(f"\n📌 {description}...")
     try:
         if capture:
@@ -34,7 +34,8 @@ def run_command(command, description, capture=True, check_error=True):
             )
             if result.stdout:
                 print(result.stdout)
-            return result.stdout.strip()
+            # QUAN TRỌNG: Trả về "SUCCESS" thay vì stdout.strip() để tránh nhầm lẫn với chuỗi rỗng
+            return "SUCCESS"
         else:
             # Với capture=False, chỉ chạy và hiển thị output real-time
             result = subprocess.run(command, shell=True, check=True)
@@ -128,18 +129,19 @@ def setup_colab_git():
 
 def main():
     print("=" * 70)
-    print("🚀 PUSH CODE VÀ TẠO PULL REQUEST - BẢN ĐÃ SỬA")
+    print("🚀 PUSH CODE VÀ TẠO PULL REQUEST - BẢN ĐÃ SỬA LỖI")
     print("=" * 70)
 
     # Setup cho Colab nếu cần
     setup_colab_git()
-    check_git_auth()  # Thêm kiểm tra authentication
+    check_git_auth()
 
     if not is_colab():
         print("\n💻 Môi trường: PyCharm/Local IDE")
 
-    # Kiểm tra Git repository
-    if not run_command("git rev-parse --git-dir", "Kiểm tra Git repository", check_error=False):
+    # Kiểm tra Git repository - SỬA: dùng check_error=False
+    git_check = run_command("git rev-parse --git-dir", "Kiểm tra Git repository", check_error=False)
+    if not git_check:
         print("❌ Không phải Git repository")
         sys.exit(1)
 
@@ -157,7 +159,7 @@ def main():
 
     # Kiểm tra remote
     remote_check = run_command("git remote -v", "Kiểm tra remote", check_error=False)
-    if not remote_check or not remote_check.strip():
+    if not remote_check:
         print("\n❌ Chưa có remote repository")
         add_remote = get_input("Thêm remote ngay? (y/n)", "y").lower()
         if add_remote == 'y':
@@ -168,7 +170,7 @@ def main():
             sys.exit(1)
 
     # Kiểm tra có thay đổi không
-    status = run_command("git status --porcelain", "Kiểm tra trạng thái")
+    status = run_command("git status --porcelain", "Kiểm tra trạng thái", check_error=False)
 
     has_changes = bool(status and status.strip())
 
@@ -195,7 +197,7 @@ def main():
             sys.exit(0)
     else:
         print("\n📝 Các thay đổi:")
-        status_lines = status.strip().split('\n')
+        status_lines = status.strip().split('\n') if status else []
 
         # Hiển thị tối đa 20 files
         for line in status_lines[:20]:
@@ -209,15 +211,20 @@ def main():
         if review == 'y':
             run_command("git diff --stat", "Thống kê thay đổi", capture=False, check_error=False)
 
-        # Add all files
+        # Add all files - SỬA QUAN TRỌNG: Kiểm tra kết quả đúng cách
         add_all = get_input("\nThêm tất cả các thay đổi? (y/n)", "y").lower()
 
         if add_all == 'y':
-            if not run_command("git add .", "Thêm tất cả các thay đổi"):
+            result = run_command("git add .", "Thêm tất cả các thay đổi")
+            # CHỈ thoát nếu có lỗi (trả về None)
+            if result is None:
+                print("❌ Lỗi khi thêm files")
                 sys.exit(1)
         else:
             files_to_add = get_input("Nhập files cần add (cách nhau bởi dấu cách)")
-            if not run_command(f"git add {files_to_add}", "Thêm files đã chọn"):
+            result = run_command(f"git add {files_to_add}", "Thêm files đã chọn")
+            if result is None:
+                print("❌ Lỗi khi thêm files")
                 sys.exit(1)
 
         # Commit
@@ -239,7 +246,10 @@ def main():
             author_name = get_input("Tên của bạn (VD: member1)")
             commit_msg = f"[{author_name}] {commit_msg}"
 
-        if not run_command(f'git commit -m "{commit_msg}"', "Commit thay đổi"):
+        # SỬA: Kiểm tra kết quả commit đúng cách
+        result = run_command(f'git commit -m "{commit_msg}"', "Commit thay đổi")
+        if result is None:
+            print("❌ Lỗi khi commit")
             sys.exit(1)
 
     # Pull trước khi push để tránh conflict
@@ -256,7 +266,7 @@ def main():
         print("Sau khi giải quyết: git add . && git rebase --continue")
         sys.exit(1)
 
-    # PUSH - PHẦN QUAN TRỌNG ĐÃ SỬA
+    # PUSH - PHẦN QUAN TRỌNG
     print(f"\n🚀 Push branch {current_branch} lên remote...")
 
     # Kiểm tra branch đã có trên remote chưa
@@ -273,15 +283,15 @@ def main():
         push_cmd = f"git push -u origin {current_branch}"
         print(f"ℹ️  Branch mới, sẽ tạo trên remote")
 
-    # SỬA: Chạy push trực tiếp và kiểm tra kết quả
-    print(f"\n📌 Push code lên GitHub...")
+    # Thực hiện push
+    print(f"\n📌 Đang push code lên GitHub...")
     try:
         result = subprocess.run(push_cmd, shell=True, check=True, capture_output=True, text=True)
         print("✅ Push thành công!")
         if result.stdout:
             print(result.stdout)
     except subprocess.CalledProcessError as e:
-        print(f"❌ Lỗi push: {e.stderr}")
+        print(f"❌ Lỗi khi push: {e.stderr}")
         print("❌ Push thất bại")
         print("\n💡 Một số giải pháp:")
         print("   1. Kiểm tra quyền truy cập repository")
@@ -289,7 +299,6 @@ def main():
         print("   3. Pull code mới nhất trước")
         sys.exit(1)
 
-    # Phần còn lại giữ nguyên...
     print("✅ Push thành công!")
 
     # Lấy thông tin repo
@@ -317,7 +326,6 @@ def main():
             if repo_info:
                 pr_url = f"https://github.com/{repo_info}/compare/{current_branch}?expand=1"
                 print(f"\n🔗 Hoặc tạo PR thủ công tại:\n   {pr_url}")
-
             sys.exit(0)
 
         # Lấy thông tin PR
