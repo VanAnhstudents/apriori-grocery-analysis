@@ -20,7 +20,7 @@ def is_colab():
         return False
 
 
-def run_command(command, description, capture=True, check_error=True):
+def run_command(command, description, capture=True, check_error=True, return_output=False):
     """Chạy command và hiển thị kết quả - ĐÃ SỬA LỖI"""
     print(f"\n📌 {description}...")
     try:
@@ -32,9 +32,12 @@ def run_command(command, description, capture=True, check_error=True):
                 capture_output=True,
                 text=True
             )
-            if result.stdout:
+            if result.stdout and not return_output:
                 print(result.stdout)
-            # QUAN TRỌNG: Trả về "SUCCESS" thay vì stdout.strip() để tránh nhầm lẫn với chuỗi rỗng
+            # Nếu cần output thực tế (như branch name), trả về stdout
+            if return_output:
+                return result.stdout.strip()
+            # Ngược lại trả về "SUCCESS" để biết command thành công
             return "SUCCESS"
         else:
             # Với capture=False, chỉ chạy và hiển thị output real-time
@@ -46,7 +49,7 @@ def run_command(command, description, capture=True, check_error=True):
             print(f"❌ Lỗi: {error_msg}")
             return None
         else:
-            return error_msg.strip()
+            return error_msg.strip() if capture else str(e)
 
 
 def get_input(prompt, default=None):
