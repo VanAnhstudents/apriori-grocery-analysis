@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Script đẩy code lên GitHub và tạo Pull Request
-Hỗ trợ PyCharm và Google Colab
+Script đẩy code lên GitHub
+Hỗ trợ PyCharm, VS Code và Google Colab
 """
 
 import subprocess
@@ -20,6 +20,7 @@ if sys.platform == "win32":
         if os.path.exists(cli_path) and cli_path not in os.environ["PATH"]:
             os.environ["PATH"] = cli_path + ";" + os.environ["PATH"]
 
+
 # Kiểm tra môi trường
 def is_colab():
     """Kiểm tra có đang chạy trên Google Colab không"""
@@ -28,6 +29,12 @@ def is_colab():
         return True
     except ImportError:
         return False
+
+
+def is_vscode():
+    """Kiểm tra có đang chạy trên VS Code không"""
+    return "VSCODE_PID" in os.environ
+
 
 def run_command(command, description, capture=True, check_error=True):
     """Chạy command và hiển thị kết quả"""
@@ -65,57 +72,35 @@ def get_input(prompt, default=None):
     return input(f"{prompt}: ").strip()
 
 
-def check_gh_cli():
-    """Kiểm tra GitHub CLI đã cài đặt"""
-    try:
-        result = subprocess.run(
-            "gh --version",
-            shell=True,
-            check=True,
-            capture_output=True,
-            text=True,
-            timeout=10
-        )
-        return True
-    except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
-        # Thử với đường dẫn trực tiếp trên Windows
-        if sys.platform == "win32":
-            try:
-                gh_path = r"C:\Program Files\GitHub CLI\gh.exe"
-                result = subprocess.run(
-                    f'"{gh_path}" --version',
-                    shell=True,
-                    check=True,
-                    capture_output=True,
-                    text=True,
-                    timeout=10
-                )
-                return True
-            except:
-                return False
-        return False
+def detect_ide():
+    """Phát hiện môi trường IDE"""
+    if is_colab():
+        return "Google Colab"
+    elif is_vscode():
+        return "VS Code"
+    elif "PYCHARM" in os.environ:
+        return "PyCharm"
+    else:
+        return "Terminal/Local"
 
-def get_repo_info():
-    """Lấy thông tin repository"""
-    remote_url = run_command(
-        "git config --get remote.origin.url",
-        "Lấy remote URL",
-        check_error=False
-    )
 
-    if not remote_url:
-        return None
+def setup_git_config():
+    """Cấu hình Git nếu chưa được thiết lập"""
+    print("\n🔧 Kiểm tra cấu hình Git...")
 
-    # Parse GitHub repo info
-    if "github.com" in remote_url:
-        if remote_url.startswith("git@github.com:"):
-            repo_path = remote_url.replace("git@github.com:", "").replace(".git", "")
-        elif "https://github.com/" in remote_url:
-            repo_path = remote_url.replace("https://github.com/", "").replace(".git", "")
-        else:
-            repo_path = None
-        return repo_path
-    return None
+    # Kiểm tra user.name
+    user_name = run_command("git config user.name", "Kiểm tra Git username", check_error=False)
+    if not user_name:
+        print("\n⚠️  Chưa cấu hình Git username")
+        name = get_input("Nhập tên của bạn (cho Git config)", "Git User")
+        run_command(f'git config --global user.name "{name}"', "Cấu hình username")
+
+    # Kiểm tra user.email
+    user_email = run_command("git config user.email", "Kiểm tra Git email", check_error=False)
+    if not user_email:
+        print("\n⚠️  Chưa cấu hình Git email")
+        email = get_input("Nhập email (cho Git config)", "user@example.com")
+        run_command(f'git config --global user.email "{email}"', "Cấu hình email")
 
 
 def check_git_auth():
@@ -131,56 +116,13 @@ def check_git_auth():
 
     if remote_url and "https://" in remote_url:
         print("\n🔐 Remote sử dụng HTTPS - có thể cần credentials")
-        print("💡 Nếu gặp lỗi authentication:")
+        print("💡 Mẹo:")
         print("   1. Sử dụng Personal Access Token thay vì password")
         print("   2. Hoặc chuyển sang SSH: git remote set-url origin git@github.com:user/repo.git")
 
 
-def setup_colab_git():
-    """Setup Git cho Colab nếu cần"""
-    if is_colab():
-        print("\n🔍 Môi trường Google Colab")
-
-        # Kiểm tra Git config
-        user_name = run_command("git config user.name", "Lấy Git username", check_error=False)
-        if not user_name or "not set" in str(user_name).lower():
-            print("\n⚠️  Cần cấu hình Git user")
-            name = get_input("Nhập tên của bạn")
-            email = get_input("Nhập email")
-            run_command(f'git config --global user.name "{name}"', "Cấu hình username")
-            run_command(f'git config --global user.email "{email}"', "Cấu hình email")
-
-
-def main():
-    print("=" * 70)
-    print("🚀 PUSH CODE VÀ TẠO PULL REQUEST")
-    print("=" * 70)
-
-    # Kiểm tra GitHub CLI sớm để thông báo rõ ràng
-    has_gh_cli = check_gh_cli()
-    if not has_gh_cli:
-        print("\n⚠️  GitHub CLI không được tìm thấy trong môi trường hiện tại")
-        print("   Đường dẫn hiện tại:", os.environ["PATH"])
-        print("\n💡 Giải pháp:")
-        print("   1. Đảm bảo GitHub CLI được cài đặt")
-        print("   2. Thoát môi trường ảo và chạy lại:")
-        print("      gh --version")
-        print("   3. Hoặc chạy script này bên ngoài môi trường ảo")
-
-    # Setup cho Colab nếu cần
-    setup_colab_git()
-    check_git_auth()
-
-    if not is_colab():
-        print("\n💻 Môi trường: PyCharm/Local IDE")
-
-    # Kiểm tra Git repository
-    git_check = run_command("git rev-parse --git-dir", "Kiểm tra Git repository", check_error=False)
-    if not git_check:
-        print("❌ Không phải Git repository")
-        sys.exit(1)
-
-    # Lấy branch hiện tại
+def get_current_branch():
+    """Lấy branch hiện tại"""
     try:
         result = subprocess.run(
             "git branch --show-current",
@@ -190,13 +132,38 @@ def main():
             text=True
         )
         current_branch = result.stdout.strip()
-        if not current_branch:
-            print("❌ Không thể xác định branch hiện tại")
-            sys.exit(1)
-        print(f"\n📍 Branch hiện tại: {current_branch}")
+        return current_branch if current_branch else None
     except subprocess.CalledProcessError:
+        return None
+
+
+def main():
+    print("=" * 60)
+    print("🚀 PUSH CODE LÊN GITHUB")
+    print("=" * 60)
+
+    # Phát hiện môi trường
+    ide = detect_ide()
+    print(f"💻 Môi trường: {ide}")
+
+    # Cấu hình Git nếu cần
+    setup_git_config()
+    check_git_auth()
+
+    # Kiểm tra Git repository
+    git_check = run_command("git rev-parse --git-dir", "Kiểm tra Git repository", check_error=False)
+    if not git_check:
+        print("❌ Không phải Git repository")
+        print("💡 Hãy chắc chắn bạn đang trong thư mục Git repository")
+        sys.exit(1)
+
+    # Lấy branch hiện tại
+    current_branch = get_current_branch()
+    if not current_branch:
         print("❌ Không thể xác định branch hiện tại")
         sys.exit(1)
+
+    print(f"📍 Branch hiện tại: {current_branch}")
 
     # Kiểm tra remote
     remote_check = run_command("git remote -v", "Kiểm tra remote", check_error=False)
@@ -204,15 +171,14 @@ def main():
         print("\n❌ Chưa có remote repository")
         add_remote = get_input("Thêm remote ngay? (y/n)", "y").lower()
         if add_remote == 'y':
-            remote_url = get_input("Nhập URL remote repository")
+            remote_url = get_input("Nhập URL remote repository (GitHub)")
             run_command(f"git remote add origin {remote_url}", "Thêm remote")
         else:
             print("❌ Cần có remote để push code")
             sys.exit(1)
 
     # Kiểm tra có thay đổi không
-    status = run_command("git status --porcelain", "Kiểm tra trạng thái", check_error=False)
-
+    status = run_command("git status --porcelain", "Kiểm tra thay đổi", check_error=False)
     has_changes = bool(status and status.strip())
 
     if not has_changes:
@@ -234,25 +200,25 @@ def main():
             push_only = get_input("Vẫn muốn thử push? (y/n)", "n").lower()
 
         if push_only != 'y':
-            print("❌ Hủy bỏ")
+            print("✅ Không có gì để push")
             sys.exit(0)
     else:
-        print("\n📝 Các thay đổi:")
+        print("\n📝 Các file thay đổi:")
         status_lines = status.strip().split('\n') if status else []
 
-        # Hiển thị tối đa 20 files
-        for line in status_lines[:20]:
+        # Hiển thị tối đa 15 files
+        for line in status_lines[:15]:
             print(f"   {line}")
 
-        if len(status_lines) > 20:
-            print(f"   ... và {len(status_lines) - 20} file(s) khác")
+        if len(status_lines) > 15:
+            print(f"   ... và {len(status_lines) - 15} file(s) khác")
 
-        # Review changes
+        # Xem chi tiết thay đổi nếu muốn
         review = get_input("\nXem chi tiết thay đổi? (y/n)", "n").lower()
         if review == 'y':
             run_command("git diff --stat", "Thống kê thay đổi", capture=False, check_error=False)
 
-        # Add all files
+        # Add files
         add_all = get_input("\nThêm tất cả các thay đổi? (y/n)", "y").lower()
 
         if add_all == 'y':
@@ -262,17 +228,22 @@ def main():
                 sys.exit(1)
         else:
             files_to_add = get_input("Nhập files cần add (cách nhau bởi dấu cách)")
-            result = run_command(f"git add {files_to_add}", "Thêm files đã chọn")
-            if result is None:
-                print("❌ Lỗi khi thêm files")
+            if files_to_add:
+                result = run_command(f"git add {files_to_add}", "Thêm files đã chọn")
+                if result is None:
+                    print("❌ Lỗi khi thêm files")
+                    sys.exit(1)
+            else:
+                print("❌ Không có files nào được chọn")
                 sys.exit(1)
 
         # Commit
         print("\n💬 Mẫu commit message:")
-        print("   - feat: thêm tính năng X")
-        print("   - fix: sửa lỗi Y")
+        print("   - feat: thêm tính năng mới")
+        print("   - fix: sửa lỗi")
         print("   - docs: cập nhật tài liệu")
         print("   - refactor: tái cấu trúc code")
+        print("   - style: sửa định dạng")
         print("   - test: thêm tests")
 
         commit_msg = get_input("\nNhập commit message")
@@ -280,14 +251,8 @@ def main():
             print("❌ Commit message không được để trống")
             sys.exit(1)
 
-        # Thêm prefix với tên nếu muốn
-        add_author = get_input("Thêm tên vào commit? (y/n)", "n").lower()
-        if add_author == 'y':
-            author_name = get_input("Tên của bạn (VD: member1)")
-            commit_msg = f"[{author_name}] {commit_msg}"
-
         # Commit thay đổi
-        print(f"\n📌 Commit thay đổi...")
+        print(f"\n💾 Đang commit...")
         try:
             result = subprocess.run(
                 f'git commit -m "{commit_msg}"',
@@ -313,12 +278,12 @@ def main():
 
     if pull_result and "conflict" in pull_result.lower():
         print("\n⚠️  Có conflict! Cần giải quyết conflict trước khi push")
-        print("Chạy: git status để xem files conflict")
-        print("Sau khi giải quyết: git add . && git commit -m 'Resolve conflicts'")
+        print("   Chạy: git status để xem files conflict")
+        print("   Sau khi giải quyết: git add . && git commit -m 'Resolve conflicts'")
         sys.exit(1)
 
     # PUSH
-    print(f"\n🚀 Push branch {current_branch} lên remote...")
+    print(f"\n🚀 Đang push branch '{current_branch}' lên GitHub...")
 
     # Kiểm tra branch đã có trên remote chưa
     try:
@@ -339,7 +304,6 @@ def main():
         print(f"ℹ️  Branch mới, sẽ tạo trên remote")
 
     # Thực hiện push
-    print(f"\n📌 Đang push code lên GitHub...")
     try:
         result = subprocess.run(push_cmd, shell=True, check=True, capture_output=True, text=True)
         print("✅ Push thành công!")
@@ -347,7 +311,6 @@ def main():
             print(result.stdout)
     except subprocess.CalledProcessError as e:
         print(f"❌ Lỗi khi push: {e.stderr}")
-        print("❌ Push thất bại")
 
         # Phân tích lỗi chi tiết
         if "Permission denied" in e.stderr:
@@ -360,143 +323,43 @@ def main():
             print("   - Hoặc chuyển sang SSH: git remote set-url origin git@github.com:user/repo.git")
         elif "failed to push some refs" in e.stderr:
             print("\n🔄 Có thể cần pull trước:")
-            print("   - Chạy: git pull origin {current_branch} --rebase")
+            print(f"   - Chạy: git pull origin {current_branch} --rebase")
+            print("   - Sau đó chạy lại script")
+        elif "non-fast-forward" in e.stderr:
+            print("\n🔄 Remote có thay đổi mới:")
+            print(f"   - Chạy: git pull origin {current_branch}")
+            print("   - Giải quyết conflict nếu có")
             print("   - Sau đó chạy lại script")
 
         sys.exit(1)
 
-    # Lấy thông tin repo
-    repo_info = get_repo_info()
-
-    # Tạo Pull Request
-    create_pr = get_input("\n🔀 Tạo Pull Request? (y/n)", "y").lower()
-
-    if create_pr == 'y':
-        # Kiểm tra GitHub CLI
-        has_gh_cli = check_gh_cli()
-
-        if not has_gh_cli:
-            print("\n⚠️  GitHub CLI chưa được cài đặt")
-            print("📚 Cài đặt GitHub CLI:")
-            if is_colab():
-                print("   Chạy các lệnh sau trong cell trước:")
-                print(
-                    "   !curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg")
-                print(
-                    "   !echo \"deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main\" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null")
-                print("   !sudo apt update && sudo apt install gh -y")
-                print("   !gh auth login")
-            else:
-                print("   📥 Tải từ: https://cli.github.com/")
-                print("   🔐 Sau khi cài đặt, chạy: gh auth login")
-
-            # Hiển thị link tạo PR thủ công
-            if repo_info:
-                pr_url = f"https://github.com/{repo_info}/compare/main...{current_branch}?expand=1"
-                print(f"\n🔗 Tạo PR thủ công tại: {pr_url}")
-
-            # KHÔNG thoát script, tiếp tục hiển thị kết quả push thành công
-            print("\n💡 Bạn có thể tạo PR sau khi cài đặt GitHub CLI")
-
-        else:
-            # Kiểm tra xem đã đăng nhập GitHub CLI chưa
-            auth_check = run_command(
-                "gh auth status",
-                "Kiểm tra trạng thái đăng nhập GitHub CLI",
-                check_error=False
-            )
-
-            if not auth_check or "logged in" not in auth_check.lower():
-                print("\n🔐 GitHub CLI chưa đăng nhập")
-                print("   Chạy: gh auth login")
-                print("   Chọn: GitHub.com → HTTPS → Y → Paste token")
-
-                if repo_info:
-                    pr_url = f"https://github.com/{repo_info}/compare/main...{current_branch}?expand=1"
-                    print(f"\n🔗 Tạo PR thủ công tại: {pr_url}")
-            else:
-                # Lấy thông tin PR
-                base_branch = get_input("Base branch (merge vào)", "main")
-
-                print("\n📝 Template commit message gần nhất để tham khảo:")
-                recent_commit = run_command(
-                    "git log -1 --pretty=%B",
-                    "Lấy commit message",
-                    check_error=False
-                )
-                if recent_commit:
-                    print(f"   {recent_commit}")
-
-                pr_title = get_input("\nTiêu đề PR", f"Pull request từ {current_branch}")
-
-                print("\n💡 Mẫu mô tả PR:")
-                print("   ## Thay đổi")
-                print("   - Thêm/Sửa/Xóa X")
-                print("   ## Testing")
-                print("   - Đã test Y")
-                print("   ## Screenshots (nếu có)")
-                print("   - ...")
-
-                pr_body = get_input("\nMô tả PR (Enter để bỏ qua)", "")
-
-                # Tạo PR command
-                import shlex
-                pr_cmd = f'gh pr create --base {base_branch} --head {current_branch} --title {shlex.quote(pr_title)}'
-
-                if pr_body:
-                    pr_cmd += f' --body {shlex.quote(pr_body)}'
-                else:
-                    pr_cmd += ' --body ""'
-
-                # Các options khác
-                print("\n⚙️  Tùy chọn PR:")
-                is_draft = get_input("Tạo Draft PR? (y/n)", "n").lower()
-                if is_draft == 'y':
-                    pr_cmd += ' --draft'
-
-                # Assign reviewers
-                assign_reviewers = get_input("Assign reviewers? (y/n)", "n").lower()
-                if assign_reviewers == 'y':
-                    reviewers = get_input("Nhập username reviewers (cách nhau bởi dấu phẩy)")
-                    if reviewers:
-                        pr_cmd += f' --reviewer {reviewers}'
-
-                print("\n🔀 Đang tạo Pull Request...")
-                result = run_command(pr_cmd, "Tạo PR trên GitHub", check_error=False)
-
-                if result and "https://github.com" in result:
-                    print("\n✅ Tạo Pull Request thành công!")
-                    for line in result.split('\n'):
-                        if 'https://github.com' in line:
-                            print(f"🔗 PR URL: {line.strip()}")
-                else:
-                    print("❌ Không thể tạo PR tự động")
-                    if repo_info:
-                        pr_url = f"https://github.com/{repo_info}/compare/main...{current_branch}?expand=1"
-                        print(f"\n🔗 Tạo PR thủ công tại:\n   {pr_url}")
-
     # Hiển thị kết quả cuối cùng
-    print("\n" + "=" * 70)
+    print("\n" + "=" * 60)
     print("✅ HOÀN TẤT!")
-    print("=" * 70)
+    print("=" * 60)
     print(f"📍 Branch: {current_branch}")
-    print("✅ Code đã được push lên GitHub")
-
-    if create_pr == 'y' and has_gh_cli:
-        print("✅ Pull Request đã được tạo")
-        print("\n👥 Nhớ thông báo team review PR nhé!")
+    print("✅ Code đã được push lên GitHub thành công!")
 
     # Hiển thị commit cuối
     print("\n📝 Commit vừa push:")
     run_command("git log -1 --oneline", "Hiển thị commit", check_error=False)
 
     # Hiển thị trạng thái remote
-    print("\n🌐 Kiểm tra trên GitHub:")
-    if repo_info:
-        print(f"   🔗 Repository: https://github.com/{repo_info}")
-        print(f"   🔗 Branch: https://github.com/{repo_info}/tree/{current_branch}")
+    remote_url = run_command("git config --get remote.origin.url", "Lấy remote URL", check_error=False)
+    if remote_url and "github.com" in remote_url:
+        if remote_url.startswith("git@github.com:"):
+            repo_path = remote_url.replace("git@github.com:", "").replace(".git", "")
+        elif "https://github.com/" in remote_url:
+            repo_path = remote_url.replace("https://github.com/", "").replace(".git", "")
+        else:
+            repo_path = None
 
-    print("\n🎉 Chúc mừng! Code đã được đẩy lên GitHub thành công!")
+        if repo_path:
+            print(f"\n🌐 Kiểm tra trên GitHub:")
+            print(f"   🔗 Repository: https://github.com/{repo_path}")
+            print(f"   🔗 Branch: https://github.com/{repo_path}/tree/{current_branch}")
+
+    print("\n🎉 Chúc mừng! Code đã được đẩy lên GitHub!")
 
 
 if __name__ == "__main__":
@@ -507,7 +370,4 @@ if __name__ == "__main__":
         sys.exit(1)
     except Exception as e:
         print(f"\n❌ Lỗi: {e}")
-        import traceback
-
-        traceback.print_exc()
         sys.exit(1)
