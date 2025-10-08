@@ -253,9 +253,12 @@ def main():
 
         # Thêm prefix với tên
         add_author = get_input("Thêm tên vào commit? (y/n)", "n").lower()
-        if add_author != 'y':
+        if add_author == 'y':
             author_name = get_input("Tên của bạn (VD: member1)")
-            commit_msg = f"[{author_name}] {commit_msg}"
+            if author_name:
+                commit_msg = f"[{author_name}] {commit_msg}"
+            else:
+                print("⚠️  Không có tên được thêm vào, sử dụng commit message gốc")
 
         # Commit thay đổi
         print(f"\n💾 Đang commit...")
