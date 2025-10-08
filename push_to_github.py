@@ -129,7 +129,7 @@ def setup_colab_git():
 
 def main():
     print("=" * 70)
-    print("🚀 PUSH CODE VÀ TẠO PULL REQUEST - BẢN ĐÃ SỬA HOÀN TOÀN")
+    print("🚀 PUSH CODE VÀ TẠO PULL REQUEST")
     print("=" * 70)
 
     # Setup cho Colab nếu cần
@@ -282,7 +282,7 @@ def main():
         print("Sau khi giải quyết: git add . && git commit -m 'Resolve conflicts'")
         sys.exit(1)
 
-    # PUSH - PHẦN QUAN TRỌNG ĐÃ SỬA
+    # PUSH
     print(f"\n🚀 Push branch {current_branch} lên remote...")
 
     # Kiểm tra branch đã có trên remote chưa
@@ -333,7 +333,7 @@ def main():
     # Lấy thông tin repo
     repo_info = get_repo_info()
 
-    # Tạo Pull Request
+    # Tạo Pull Request - PHẦN ĐÃ SỬA
     create_pr = get_input("\n🔀 Tạo Pull Request? (y/n)", "y").lower()
 
     if create_pr == 'y':
@@ -342,79 +342,103 @@ def main():
 
         if not has_gh_cli:
             print("\n⚠️  GitHub CLI chưa được cài đặt")
-            print("Cài đặt:")
+            print("📚 Cài đặt GitHub CLI:")
             if is_colab():
+                print("   Chạy các lệnh sau trong cell trước:")
                 print(
                     "   !curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg")
                 print(
                     "   !echo \"deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main\" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null")
-                print("   !sudo apt update && sudo apt install gh")
+                print("   !sudo apt update && sudo apt install gh -y")
+                print("   !gh auth login")
             else:
-                print("   https://cli.github.com/")
+                print("   📥 Tải từ: https://cli.github.com/")
+                print("   🔐 Sau khi cài đặt, chạy: gh auth login")
 
+            # Hiển thị link tạo PR thủ công
             if repo_info:
-                pr_url = f"https://github.com/{repo_info}/compare/{current_branch}?expand=1"
-                print(f"\n🔗 Hoặc tạo PR thủ công tại:\n   {pr_url}")
-            # KHÔNG thoát ở đây, tiếp tục hiển thị kết quả push thành công
-        else:
-            # Lấy thông tin PR
-            base_branch = get_input("Base branch (merge vào)", "main")
+                pr_url = f"https://github.com/{repo_info}/compare/main...{current_branch}?expand=1"
+                print(f"\n🔗 Tạo PR thủ công tại: {pr_url}")
 
-            print("\n📝 Template commit message gần nhất để tham khảo:")
-            recent_commit = run_command(
-                "git log -1 --pretty=%B",
-                "Lấy commit message",
+            # KHÔNG thoát script, tiếp tục hiển thị kết quả push thành công
+            print("\n💡 Bạn có thể tạo PR sau khi cài đặt GitHub CLI")
+
+        else:
+            # Kiểm tra xem đã đăng nhập GitHub CLI chưa
+            auth_check = run_command(
+                "gh auth status",
+                "Kiểm tra trạng thái đăng nhập GitHub CLI",
                 check_error=False
             )
-            if recent_commit:
-                print(f"   {recent_commit}")
 
-            pr_title = get_input("\nTiêu đề PR", f"Pull request từ {current_branch}")
+            if not auth_check or "logged in" not in auth_check.lower():
+                print("\n🔐 GitHub CLI chưa đăng nhập")
+                print("   Chạy: gh auth login")
+                print("   Chọn: GitHub.com → HTTPS → Y → Paste token")
 
-            print("\n💡 Mẫu mô tả PR:")
-            print("   ## Thay đổi")
-            print("   - Thêm/Sửa/Xóa X")
-            print("   ## Testing")
-            print("   - Đã test Y")
-            print("   ## Screenshots (nếu có)")
-            print("   - ...")
-
-            pr_body = get_input("\nMô tả PR (Enter để bỏ qua)", "")
-
-            # Tạo PR command
-            pr_cmd = f'gh pr create --base {base_branch} --head {current_branch} --title "{pr_title}"'
-
-            if pr_body:
-                pr_cmd += f' --body "{pr_body}"'
-            else:
-                pr_cmd += ' --body ""'
-
-            # Các options khác
-            print("\n⚙️  Tùy chọn PR:")
-            is_draft = get_input("Tạo Draft PR? (y/n)", "n").lower()
-            if is_draft == 'y':
-                pr_cmd += ' --draft'
-
-            # Assign reviewers
-            assign_reviewers = get_input("Assign reviewers? (y/n)", "n").lower()
-            if assign_reviewers == 'y':
-                reviewers = get_input("Nhập username reviewers (cách nhau bởi dấu phẩy)")
-                if reviewers:
-                    pr_cmd += f' --reviewer {reviewers}'
-
-            print("\n🔀 Đang tạo Pull Request...")
-            result = run_command(pr_cmd, "Tạo PR trên GitHub")
-
-            if result:
-                print("\n✅ Tạo Pull Request thành công!")
-                for line in result.split('\n'):
-                    if 'https://github.com' in line:
-                        print(f"🔗 {line.strip()}")
-            else:
-                print("❌ Không thể tạo PR")
                 if repo_info:
-                    pr_url = f"https://github.com/{repo_info}/compare/{current_branch}?expand=1"
-                    print(f"\n🔗 Tạo PR thủ công tại:\n   {pr_url}")
+                    pr_url = f"https://github.com/{repo_info}/compare/main...{current_branch}?expand=1"
+                    print(f"\n🔗 Tạo PR thủ công tại: {pr_url}")
+            else:
+                # Lấy thông tin PR
+                base_branch = get_input("Base branch (merge vào)", "main")
+
+                print("\n📝 Template commit message gần nhất để tham khảo:")
+                recent_commit = run_command(
+                    "git log -1 --pretty=%B",
+                    "Lấy commit message",
+                    check_error=False
+                )
+                if recent_commit:
+                    print(f"   {recent_commit}")
+
+                pr_title = get_input("\nTiêu đề PR", f"Pull request từ {current_branch}")
+
+                print("\n💡 Mẫu mô tả PR:")
+                print("   ## Thay đổi")
+                print("   - Thêm/Sửa/Xóa X")
+                print("   ## Testing")
+                print("   - Đã test Y")
+                print("   ## Screenshots (nếu có)")
+                print("   - ...")
+
+                pr_body = get_input("\nMô tả PR (Enter để bỏ qua)", "")
+
+                # Tạo PR command - SỬA: Escape ký tự đặc biệt
+                import shlex
+                pr_cmd = f'gh pr create --base {base_branch} --head {current_branch} --title {shlex.quote(pr_title)}'
+
+                if pr_body:
+                    pr_cmd += f' --body {shlex.quote(pr_body)}'
+                else:
+                    pr_cmd += ' --body ""'
+
+                # Các options khác
+                print("\n⚙️  Tùy chọn PR:")
+                is_draft = get_input("Tạo Draft PR? (y/n)", "n").lower()
+                if is_draft == 'y':
+                    pr_cmd += ' --draft'
+
+                # Assign reviewers
+                assign_reviewers = get_input("Assign reviewers? (y/n)", "n").lower()
+                if assign_reviewers == 'y':
+                    reviewers = get_input("Nhập username reviewers (cách nhau bởi dấu phẩy)")
+                    if reviewers:
+                        pr_cmd += f' --reviewer {reviewers}'
+
+                print("\n🔀 Đang tạo Pull Request...")
+                result = run_command(pr_cmd, "Tạo PR trên GitHub", check_error=False)
+
+                if result and "https://github.com" in result:
+                    print("\n✅ Tạo Pull Request thành công!")
+                    for line in result.split('\n'):
+                        if 'https://github.com' in line:
+                            print(f"🔗 PR URL: {line.strip()}")
+                else:
+                    print("❌ Không thể tạo PR tự động")
+                    if repo_info:
+                        pr_url = f"https://github.com/{repo_info}/compare/main...{current_branch}?expand=1"
+                        print(f"\n🔗 Tạo PR thủ công tại:\n   {pr_url}")
 
     # Hiển thị kết quả cuối cùng
     print("\n" + "=" * 70)
