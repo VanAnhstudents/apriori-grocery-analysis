@@ -251,6 +251,12 @@ def main():
             print("❌ Commit message không được để trống")
             sys.exit(1)
 
+        # Thêm prefix với tên
+        add_author = get_input("Thêm tên vào commit? (y/n)", "n").lower()
+        if add_author != 'y':
+            author_name = get_input("Tên của bạn (VD: member1)")
+            commit_msg = f"[{author_name}] {commit_msg}"
+
         # Commit thay đổi
         print(f"\n💾 Đang commit...")
         try:
