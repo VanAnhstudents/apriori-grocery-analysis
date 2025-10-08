@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Script đẩy code lên GitHub và tạo Pull Request - BẢN ĐÃ SỬA LỖI
+Script đẩy code lên GitHub và tạo Pull Request - BẢN ĐÃ SỬA HOÀN TOÀN
 Hỗ trợ PyCharm và Google Colab
 """
 
@@ -20,8 +20,8 @@ def is_colab():
         return False
 
 
-def run_command(command, description, capture=True, check_error=True, return_output=False):
-    """Chạy command và hiển thị kết quả - ĐÃ SỬA LỖI"""
+def run_command(command, description, capture=True, check_error=True):
+    """Chạy command và hiển thị kết quả - ĐÃ SỬA HOÀN TOÀN"""
     print(f"\n📌 {description}...")
     try:
         if capture:
@@ -32,13 +32,10 @@ def run_command(command, description, capture=True, check_error=True, return_out
                 capture_output=True,
                 text=True
             )
-            if result.stdout and not return_output:
-                print(result.stdout)
-            # Nếu cần output thực tế (như branch name), trả về stdout
-            if return_output:
-                return result.stdout.strip()
-            # Ngược lại trả về "SUCCESS" để biết command thành công
-            return "SUCCESS"
+            output = result.stdout.strip()
+            if output:
+                print(output)
+            return output  # Luôn trả về output thực tế
         else:
             # Với capture=False, chỉ chạy và hiển thị output real-time
             result = subprocess.run(command, shell=True, check=True)
@@ -132,7 +129,7 @@ def setup_colab_git():
 
 def main():
     print("=" * 70)
-    print("🚀 PUSH CODE VÀ TẠO PULL REQUEST - BẢN ĐÃ SỬA LỖI")
+    print("🚀 PUSH CODE VÀ TẠO PULL REQUEST - BẢN ĐÃ SỬA HOÀN TOÀN")
     print("=" * 70)
 
     # Setup cho Colab nếu cần
@@ -142,23 +139,29 @@ def main():
     if not is_colab():
         print("\n💻 Môi trường: PyCharm/Local IDE")
 
-    # Kiểm tra Git repository - SỬA: dùng check_error=False
+    # Kiểm tra Git repository
     git_check = run_command("git rev-parse --git-dir", "Kiểm tra Git repository", check_error=False)
     if not git_check:
         print("❌ Không phải Git repository")
         sys.exit(1)
 
-    # Lấy branch hiện tại
-    current_branch = run_command(
-        "git branch --show-current",
-        "Lấy branch hiện tại"
-    )
-
-    if not current_branch:
+    # Lấy branch hiện tại - SỬA: Dùng subprocess trực tiếp để đảm bảo lấy được branch
+    try:
+        result = subprocess.run(
+            "git branch --show-current",
+            shell=True,
+            check=True,
+            capture_output=True,
+            text=True
+        )
+        current_branch = result.stdout.strip()
+        if not current_branch:
+            print("❌ Không thể xác định branch hiện tại")
+            sys.exit(1)
+        print(f"\n📍 Branch hiện tại: {current_branch}")
+    except subprocess.CalledProcessError:
         print("❌ Không thể xác định branch hiện tại")
         sys.exit(1)
-
-    print(f"\n📍 Branch hiện tại: {current_branch}")
 
     # Kiểm tra remote
     remote_check = run_command("git remote -v", "Kiểm tra remote", check_error=False)
@@ -214,12 +217,11 @@ def main():
         if review == 'y':
             run_command("git diff --stat", "Thống kê thay đổi", capture=False, check_error=False)
 
-        # Add all files - SỬA QUAN TRỌNG: Kiểm tra kết quả đúng cách
+        # Add all files
         add_all = get_input("\nThêm tất cả các thay đổi? (y/n)", "y").lower()
 
         if add_all == 'y':
             result = run_command("git add .", "Thêm tất cả các thay đổi")
-            # CHỈ thoát nếu có lỗi (trả về None)
             if result is None:
                 print("❌ Lỗi khi thêm files")
                 sys.exit(1)
@@ -249,36 +251,51 @@ def main():
             author_name = get_input("Tên của bạn (VD: member1)")
             commit_msg = f"[{author_name}] {commit_msg}"
 
-        # SỬA: Kiểm tra kết quả commit đúng cách
-        result = run_command(f'git commit -m "{commit_msg}"', "Commit thay đổi")
-        if result is None:
-            print("❌ Lỗi khi commit")
+        # Commit thay đổi - SỬA: Dùng subprocess trực tiếp
+        print(f"\n📌 Commit thay đổi...")
+        try:
+            result = subprocess.run(
+                f'git commit -m "{commit_msg}"',
+                shell=True,
+                check=True,
+                capture_output=True,
+                text=True
+            )
+            print("✅ Commit thành công!")
+            if result.stdout:
+                print(result.stdout)
+        except subprocess.CalledProcessError as e:
+            print(f"❌ Lỗi khi commit: {e.stderr}")
             sys.exit(1)
 
-    # Pull trước khi push để tránh conflict
+    # Pull trước khi push để tránh conflict - SỬA: Dùng check_error=False
     print(f"\n🔄 Đồng bộ với remote...")
     pull_result = run_command(
-        f"git pull origin {current_branch} --rebase",
-        "Pull và rebase từ remote",
+        f"git pull origin {current_branch}",
+        "Pull từ remote",
         check_error=False
     )
 
     if pull_result and "conflict" in pull_result.lower():
         print("\n⚠️  Có conflict! Cần giải quyết conflict trước khi push")
         print("Chạy: git status để xem files conflict")
-        print("Sau khi giải quyết: git add . && git rebase --continue")
+        print("Sau khi giải quyết: git add . && git commit -m 'Resolve conflicts'")
         sys.exit(1)
 
-    # PUSH - PHẦN QUAN TRỌNG
+    # PUSH - PHẦN QUAN TRỌNG ĐÃ SỬA
     print(f"\n🚀 Push branch {current_branch} lên remote...")
 
     # Kiểm tra branch đã có trên remote chưa
-    remote_exists = subprocess.run(
-        f"git ls-remote --heads origin {current_branch}",
-        shell=True,
-        capture_output=True,
-        text=True
-    ).stdout.strip()
+    try:
+        remote_check = subprocess.run(
+            f"git ls-remote --heads origin {current_branch}",
+            shell=True,
+            capture_output=True,
+            text=True
+        )
+        remote_exists = bool(remote_check.stdout.strip())
+    except:
+        remote_exists = False
 
     if remote_exists:
         push_cmd = f"git push origin {current_branch}"
@@ -286,7 +303,7 @@ def main():
         push_cmd = f"git push -u origin {current_branch}"
         print(f"ℹ️  Branch mới, sẽ tạo trên remote")
 
-    # Thực hiện push
+    # Thực hiện push - SỬA: Dùng subprocess trực tiếp với xử lý lỗi chi tiết
     print(f"\n📌 Đang push code lên GitHub...")
     try:
         result = subprocess.run(push_cmd, shell=True, check=True, capture_output=True, text=True)
@@ -296,13 +313,22 @@ def main():
     except subprocess.CalledProcessError as e:
         print(f"❌ Lỗi khi push: {e.stderr}")
         print("❌ Push thất bại")
-        print("\n💡 Một số giải pháp:")
-        print("   1. Kiểm tra quyền truy cập repository")
-        print("   2. Kiểm tra kết nối mạng")
-        print("   3. Pull code mới nhất trước")
-        sys.exit(1)
 
-    print("✅ Push thành công!")
+        # Phân tích lỗi chi tiết
+        if "Permission denied" in e.stderr:
+            print("\n🔐 Lỗi quyền truy cập:")
+            print("   - Kiểm tra token/username/password")
+            print("   - Đảm bảo bạn có quyền push vào repository này")
+        elif "could not read Username" in e.stderr:
+            print("\n🔐 Lỗi authentication:")
+            print("   - Đối với HTTPS: sử dụng Personal Access Token thay vì password")
+            print("   - Hoặc chuyển sang SSH: git remote set-url origin git@github.com:user/repo.git")
+        elif "failed to push some refs" in e.stderr:
+            print("\n🔄 Có thể cần pull trước:")
+            print("   - Chạy: git pull origin {current_branch} --rebase")
+            print("   - Sau đó chạy lại script")
+
+        sys.exit(1)
 
     # Lấy thông tin repo
     repo_info = get_repo_info()
@@ -329,67 +355,66 @@ def main():
             if repo_info:
                 pr_url = f"https://github.com/{repo_info}/compare/{current_branch}?expand=1"
                 print(f"\n🔗 Hoặc tạo PR thủ công tại:\n   {pr_url}")
-            sys.exit(0)
-
-        # Lấy thông tin PR
-        base_branch = get_input("Base branch (merge vào)", "main")
-
-        print("\n📝 Template commit message gần nhất để tham khảo:")
-        recent_commit = run_command(
-            "git log -1 --pretty=%B",
-            "Lấy commit message",
-            check_error=False
-        )
-        if recent_commit:
-            print(f"   {recent_commit}")
-
-        pr_title = get_input("\nTiêu đề PR", f"Pull request từ {current_branch}")
-
-        print("\n💡 Mẫu mô tả PR:")
-        print("   ## Thay đổi")
-        print("   - Thêm/Sửa/Xóa X")
-        print("   ## Testing")
-        print("   - Đã test Y")
-        print("   ## Screenshots (nếu có)")
-        print("   - ...")
-
-        pr_body = get_input("\nMô tả PR (Enter để bỏ qua)", "")
-
-        # Tạo PR command
-        pr_cmd = f'gh pr create --base {base_branch} --head {current_branch} --title "{pr_title}"'
-
-        if pr_body:
-            pr_cmd += f' --body "{pr_body}"'
+            # KHÔNG thoát ở đây, tiếp tục hiển thị kết quả push thành công
         else:
-            pr_cmd += ' --body ""'
+            # Lấy thông tin PR
+            base_branch = get_input("Base branch (merge vào)", "main")
 
-        # Các options khác
-        print("\n⚙️  Tùy chọn PR:")
-        is_draft = get_input("Tạo Draft PR? (y/n)", "n").lower()
-        if is_draft == 'y':
-            pr_cmd += ' --draft'
+            print("\n📝 Template commit message gần nhất để tham khảo:")
+            recent_commit = run_command(
+                "git log -1 --pretty=%B",
+                "Lấy commit message",
+                check_error=False
+            )
+            if recent_commit:
+                print(f"   {recent_commit}")
 
-        # Assign reviewers
-        assign_reviewers = get_input("Assign reviewers? (y/n)", "n").lower()
-        if assign_reviewers == 'y':
-            reviewers = get_input("Nhập username reviewers (cách nhau bởi dấu phẩy)")
-            if reviewers:
-                pr_cmd += f' --reviewer {reviewers}'
+            pr_title = get_input("\nTiêu đề PR", f"Pull request từ {current_branch}")
 
-        print("\n🔀 Đang tạo Pull Request...")
-        result = run_command(pr_cmd, "Tạo PR trên GitHub")
+            print("\n💡 Mẫu mô tả PR:")
+            print("   ## Thay đổi")
+            print("   - Thêm/Sửa/Xóa X")
+            print("   ## Testing")
+            print("   - Đã test Y")
+            print("   ## Screenshots (nếu có)")
+            print("   - ...")
 
-        if result:
-            print("\n✅ Tạo Pull Request thành công!")
-            for line in result.split('\n'):
-                if 'https://github.com' in line:
-                    print(f"🔗 {line.strip()}")
-        else:
-            print("❌ Không thể tạo PR")
-            if repo_info:
-                pr_url = f"https://github.com/{repo_info}/compare/{current_branch}?expand=1"
-                print(f"\n🔗 Tạo PR thủ công tại:\n   {pr_url}")
-            sys.exit(1)
+            pr_body = get_input("\nMô tả PR (Enter để bỏ qua)", "")
+
+            # Tạo PR command
+            pr_cmd = f'gh pr create --base {base_branch} --head {current_branch} --title "{pr_title}"'
+
+            if pr_body:
+                pr_cmd += f' --body "{pr_body}"'
+            else:
+                pr_cmd += ' --body ""'
+
+            # Các options khác
+            print("\n⚙️  Tùy chọn PR:")
+            is_draft = get_input("Tạo Draft PR? (y/n)", "n").lower()
+            if is_draft == 'y':
+                pr_cmd += ' --draft'
+
+            # Assign reviewers
+            assign_reviewers = get_input("Assign reviewers? (y/n)", "n").lower()
+            if assign_reviewers == 'y':
+                reviewers = get_input("Nhập username reviewers (cách nhau bởi dấu phẩy)")
+                if reviewers:
+                    pr_cmd += f' --reviewer {reviewers}'
+
+            print("\n🔀 Đang tạo Pull Request...")
+            result = run_command(pr_cmd, "Tạo PR trên GitHub")
+
+            if result:
+                print("\n✅ Tạo Pull Request thành công!")
+                for line in result.split('\n'):
+                    if 'https://github.com' in line:
+                        print(f"🔗 {line.strip()}")
+            else:
+                print("❌ Không thể tạo PR")
+                if repo_info:
+                    pr_url = f"https://github.com/{repo_info}/compare/{current_branch}?expand=1"
+                    print(f"\n🔗 Tạo PR thủ công tại:\n   {pr_url}")
 
     # Hiển thị kết quả cuối cùng
     print("\n" + "=" * 70)
@@ -398,7 +423,7 @@ def main():
     print(f"📍 Branch: {current_branch}")
     print("✅ Code đã được push lên GitHub")
 
-    if create_pr == 'y':
+    if create_pr == 'y' and has_gh_cli:
         print("✅ Pull Request đã được tạo")
         print("\n👥 Nhớ thông báo team review PR nhé!")
 
@@ -406,7 +431,13 @@ def main():
     print("\n📝 Commit vừa push:")
     run_command("git log -1 --oneline", "Hiển thị commit", check_error=False)
 
-    print("\n🎉 Chúc mừng! Hãy nghỉ ngơi hoặc làm việc tiếp!")
+    # Hiển thị trạng thái remote
+    print("\n🌐 Kiểm tra trên GitHub:")
+    if repo_info:
+        print(f"   🔗 Repository: https://github.com/{repo_info}")
+        print(f"   🔗 Branch: https://github.com/{repo_info}/tree/{current_branch}")
+
+    print("\n🎉 Chúc mừng! Code đã được đẩy lên GitHub thành công!")
 
 
 if __name__ == "__main__":
