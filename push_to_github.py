@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Script đẩy code lên GitHub và tạo Pull Request - BẢN ĐÃ SỬA HOÀN TOÀN
+Script đẩy code lên GitHub và tạo Pull Request
 Hỗ trợ PyCharm và Google Colab
 """
 
@@ -9,6 +9,16 @@ import sys
 import os
 from datetime import datetime
 
+# Thêm GitHub CLI vào PATH cho môi trường ảo trên Windows
+if sys.platform == "win32":
+    github_cli_paths = [
+        r"C:\Program Files\GitHub CLI",
+        r"C:\Program Files (x86)\GitHub CLI",
+        os.path.expanduser(r"~\AppData\Local\Programs\GitHub CLI")
+    ]
+    for cli_path in github_cli_paths:
+        if os.path.exists(cli_path) and cli_path not in os.environ["PATH"]:
+            os.environ["PATH"] = cli_path + ";" + os.environ["PATH"]
 
 # Kiểm tra môi trường
 def is_colab():
@@ -19,9 +29,8 @@ def is_colab():
     except ImportError:
         return False
 
-
 def run_command(command, description, capture=True, check_error=True):
-    """Chạy command và hiển thị kết quả - ĐÃ SỬA HOÀN TOÀN"""
+    """Chạy command và hiển thị kết quả"""
     print(f"\n📌 {description}...")
     try:
         if capture:
@@ -35,9 +44,8 @@ def run_command(command, description, capture=True, check_error=True):
             output = result.stdout.strip()
             if output:
                 print(output)
-            return output  # Luôn trả về output thực tế
+            return output
         else:
-            # Với capture=False, chỉ chạy và hiển thị output real-time
             result = subprocess.run(command, shell=True, check=True)
             return "SUCCESS"
     except subprocess.CalledProcessError as e:
@@ -58,18 +66,34 @@ def get_input(prompt, default=None):
 
 
 def check_gh_cli():
-    """Kiểm tra GitHub CLI đã cài đặt chưa"""
+    """Kiểm tra GitHub CLI đã cài đặt"""
     try:
-        subprocess.run(
+        result = subprocess.run(
             "gh --version",
             shell=True,
             check=True,
-            capture_output=True
+            capture_output=True,
+            text=True,
+            timeout=10
         )
         return True
-    except:
+    except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
+        # Thử với đường dẫn trực tiếp trên Windows
+        if sys.platform == "win32":
+            try:
+                gh_path = r"C:\Program Files\GitHub CLI\gh.exe"
+                result = subprocess.run(
+                    f'"{gh_path}" --version',
+                    shell=True,
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                    timeout=10
+                )
+                return True
+            except:
+                return False
         return False
-
 
 def get_repo_info():
     """Lấy thông tin repository"""
@@ -132,6 +156,17 @@ def main():
     print("🚀 PUSH CODE VÀ TẠO PULL REQUEST")
     print("=" * 70)
 
+    # Kiểm tra GitHub CLI sớm để thông báo rõ ràng
+    has_gh_cli = check_gh_cli()
+    if not has_gh_cli:
+        print("\n⚠️  GitHub CLI không được tìm thấy trong môi trường hiện tại")
+        print("   Đường dẫn hiện tại:", os.environ["PATH"])
+        print("\n💡 Giải pháp:")
+        print("   1. Đảm bảo GitHub CLI được cài đặt")
+        print("   2. Thoát môi trường ảo và chạy lại:")
+        print("      gh --version")
+        print("   3. Hoặc chạy script này bên ngoài môi trường ảo")
+
     # Setup cho Colab nếu cần
     setup_colab_git()
     check_git_auth()
@@ -145,7 +180,7 @@ def main():
         print("❌ Không phải Git repository")
         sys.exit(1)
 
-    # Lấy branch hiện tại - SỬA: Dùng subprocess trực tiếp để đảm bảo lấy được branch
+    # Lấy branch hiện tại
     try:
         result = subprocess.run(
             "git branch --show-current",
@@ -251,7 +286,7 @@ def main():
             author_name = get_input("Tên của bạn (VD: member1)")
             commit_msg = f"[{author_name}] {commit_msg}"
 
-        # Commit thay đổi - SỬA: Dùng subprocess trực tiếp
+        # Commit thay đổi
         print(f"\n📌 Commit thay đổi...")
         try:
             result = subprocess.run(
@@ -268,7 +303,7 @@ def main():
             print(f"❌ Lỗi khi commit: {e.stderr}")
             sys.exit(1)
 
-    # Pull trước khi push để tránh conflict - SỬA: Dùng check_error=False
+    # Pull trước khi push để tránh conflict
     print(f"\n🔄 Đồng bộ với remote...")
     pull_result = run_command(
         f"git pull origin {current_branch}",
@@ -303,7 +338,7 @@ def main():
         push_cmd = f"git push -u origin {current_branch}"
         print(f"ℹ️  Branch mới, sẽ tạo trên remote")
 
-    # Thực hiện push - SỬA: Dùng subprocess trực tiếp với xử lý lỗi chi tiết
+    # Thực hiện push
     print(f"\n📌 Đang push code lên GitHub...")
     try:
         result = subprocess.run(push_cmd, shell=True, check=True, capture_output=True, text=True)
@@ -333,7 +368,7 @@ def main():
     # Lấy thông tin repo
     repo_info = get_repo_info()
 
-    # Tạo Pull Request - PHẦN ĐÃ SỬA
+    # Tạo Pull Request
     create_pr = get_input("\n🔀 Tạo Pull Request? (y/n)", "y").lower()
 
     if create_pr == 'y':
@@ -404,7 +439,7 @@ def main():
 
                 pr_body = get_input("\nMô tả PR (Enter để bỏ qua)", "")
 
-                # Tạo PR command - SỬA: Escape ký tự đặc biệt
+                # Tạo PR command
                 import shlex
                 pr_cmd = f'gh pr create --base {base_branch} --head {current_branch} --title {shlex.quote(pr_title)}'
 
