@@ -1,5 +1,5 @@
 # 📝 MẪU NỘI DUNG BÁO CÁO CHI TIẾT
-## Chương 1: Giới thiệu đề tài (Nguyễn Văn Anh)
+## Chương 1: Giới thiệu đề tài
 - 1.1. Bối cảnh và lý do chọn đề tài
 - 1.2. Mục tiêu nghiên cứu
 - 1.3. Phạm vi và đối tượng nghiên cứu
@@ -7,7 +7,7 @@
 - 1.5. Cấu trúc báo cáo
 ---
 
-## Chương 2: Cơ sở lý thuyết (Nguyễn Tài Đức Minh)
+## Chương 2: Cơ sở lý thuyết
 - 2.1. Tổng quan về khai phá dữ liệu
 - 2.2. Bài toán luật kết hợp
 - 2.3. Thuật toán Apriori
@@ -18,7 +18,7 @@
 - 2.5. So sánh với phương pháp khác
 ---
 
-## Chương 3: Cài đặt thí nghiệm (Nguyễn Trí Kiên & Đồng Thị Hoàng Anh)
+## Chương 3: Cài đặt thí nghiệm
 - 3.1. Môi trường thí nghiệm
 - 3.2. Bộ dữ liệu Groceries
   - 3.2.1. Mô tả dữ liệu
@@ -32,7 +32,7 @@
   - 3.4.3. Nhận xét ban đầu
 ---
 
-## Chương 4: Đánh giá kết quả (Trần Quốc Trung)
+## Chương 4: Đánh giá kết quả
 - 4.1. Kết quả đạt được
   - 4.1.1. Về mặt thuật toán
   - 4.1.2. Về mặt ứng dụng
