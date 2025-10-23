@@ -9,3 +9,4 @@ mlxtend
 jupyter
 ipykernel
 pytest
+openpyxl

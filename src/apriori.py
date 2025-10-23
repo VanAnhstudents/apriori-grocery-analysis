@@ -3,6 +3,9 @@ import numpy as np
 from typing import List, Set, Tuple, Dict, Any
 from itertools import combinations
 from collections import defaultdict
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class Apriori:
@@ -17,9 +20,18 @@ class Apriori:
         item_counts = defaultdict(int)
         total_transactions = len(transactions)
 
+        print(f"Total transactions: {total_transactions}")
+        print(f"Min support: {self.min_support}")
+
         for transaction in transactions:
             for item in transaction:
                 item_counts[item] += 1
+
+        # Debug: print item frequencies
+        print("Item frequencies (top 20):")
+        for item, count in sorted(item_counts.items(), key=lambda x: x[1], reverse=True)[:20]:
+            support = count / total_transactions
+            print(f"  {item}: {count} transactions, support = {support:.4f}")
 
         frequent_1_itemsets = {}
         for item, count in item_counts.items():
@@ -48,20 +60,22 @@ class Apriori:
         candidates = set()
         prev_itemsets = list(prev_frequent.keys())
 
+        print(f"Generating {k}-itemsets from {len(prev_itemsets)} {k - 1}-itemsets")
+
         # Join step: combine itemsets that share first k-2 items
         for i in range(len(prev_itemsets)):
             for j in range(i + 1, len(prev_itemsets)):
                 itemset1 = prev_itemsets[i]
                 itemset2 = prev_itemsets[j]
 
-                # Check if first k-2 items are the same
-                if len(itemset1.union(itemset2)) == k:
-                    new_candidate = itemset1.union(itemset2)
-
+                # Check if we can join these itemsets
+                union_set = itemset1.union(itemset2)
+                if len(union_set) == k:
                     # Prune step: check if all subsets are frequent
-                    if not self._has_infrequent_subset(new_candidate, prev_frequent):
-                        candidates.add(new_candidate)
+                    if not self._has_infrequent_subset(union_set, prev_frequent):
+                        candidates.add(frozenset(union_set))
 
+        print(f"Generated {len(candidates)} candidate {k}-itemsets")
         return candidates
 
     def _calculate_support(self, itemset: Set, transactions: List[List[str]]) -> float:
@@ -77,8 +91,17 @@ class Apriori:
         print("Finding frequent itemsets...")
         self.frequent_itemsets = {}
 
+        if not transactions:
+            print("No transactions provided")
+            return {}
+
         # Find frequent 1-itemsets
         self.frequent_itemsets[1] = self._get_frequent_1_itemsets(transactions)
+
+        if not self.frequent_itemsets[1]:
+            print("No frequent 1-itemsets found. Try lowering min_support.")
+            return {}
+
         k = 2
 
         while self.frequent_itemsets[k - 1]:
@@ -93,6 +116,9 @@ class Apriori:
 
             self.frequent_itemsets[k] = frequent_k
             print(f"Found {len(frequent_k)} frequent {k}-itemsets")
+
+            if not frequent_k:
+                break
             k += 1
 
         # Remove empty levels
@@ -101,22 +127,36 @@ class Apriori:
         total_itemsets = sum(len(itemsets) for itemsets in self.frequent_itemsets.values())
         print(f"Total frequent itemsets found: {total_itemsets}")
 
+        # Debug: print all found itemsets
+        for k, itemsets in self.frequent_itemsets.items():
+            print(f"\n{k}-itemsets (showing first 10):")
+            for itemset, support in list(itemsets.items())[:10]:
+                print(f"  {set(itemset)}: {support:.4f}")
+
         return self.frequent_itemsets
 
     def generate_rules(self, transactions: List[List[str]]) -> List[Dict[str, Any]]:
         """Generate association rules from frequent itemsets"""
         print("Generating association rules...")
+        print(f"Min confidence: {self.min_confidence}")
 
         if not self.frequent_itemsets:
+            print("No frequent itemsets found. Running Apriori first...")
             self.find_frequent_itemsets(transactions)
+
+        if not self.frequent_itemsets:
+            print("Still no frequent itemsets after running Apriori.")
+            return []
 
         rules = []
         total_transactions = len(transactions)
 
+        rule_count = 0
         for k, itemsets in self.frequent_itemsets.items():
             if k < 2:  # Need at least 2 items to form a rule
                 continue
 
+            print(f"Generating rules from {k}-itemsets...")
             for itemset, support in itemsets.items():
                 itemset_list = list(itemset)
 
@@ -162,17 +202,28 @@ class Apriori:
                                 'lift': lift,
                                 'conviction': conviction
                             })
+                            rule_count += 1
+
+        print(f"Generated {rule_count} candidate rules before confidence filtering")
 
         # Sort rules by confidence (descending)
         rules.sort(key=lambda x: x['confidence'], reverse=True)
         self.association_rules = rules
 
-        print(f"Generated {len(rules)} association rules")
+        print(f"Final number of association rules: {len(rules)}")
+
+        if rules:
+            print("Top 5 rules:")
+            for i, rule in enumerate(rules[:5]):
+                print(f"  {i + 1}. IF {rule['antecedent']} THEN {rule['consequent']}")
+                print(f"      Support: {rule['support']:.4f}, Confidence: {rule['confidence']:.4f}")
+
         return rules
 
     def get_rules_dataframe(self) -> pd.DataFrame:
         """Convert association rules to pandas DataFrame"""
         if not self.association_rules:
+            print("No association rules to convert to DataFrame")
             return pd.DataFrame()
 
         data = []
